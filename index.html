@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeakCheck — find exposed API keys & secrets in your code</title>
+<meta name="description" content="Paste your code, .env, or config and instantly see exposed API keys, tokens, and private keys, flagged by severity. 100% in your browser — nothing is uploaded. Free, no signup.">
+<link rel="canonical" href="https://dukotah.github.io/leakcheck/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LeakCheck">
+<meta property="og:title" content="LeakCheck — find exposed secrets in your code">
+<meta property="og:description" content="Paste code, .env, or config and see exposed API keys & secrets flagged by severity. Runs entirely in your browser, nothing uploaded.">
+<meta property="og:url" content="https://dukotah.github.io/leakcheck/">
+<meta property="og:image" content="https://dukotah.github.io/leakcheck/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#faf8f4">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"LeakCheck","applicationCategory":"DeveloperApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Free client-side scanner that detects exposed API keys, tokens, and secrets in code, .env, and config files.","publisher":{"@type":"Organization","name":"Copper Bay Labs","url":"https://copperbaytech.com"}}
+</script>
+<link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="masthead" role="banner">
+  <div class="wrap hdr-bar">
+    <a class="brand" href="./" aria-label="LeakCheck — go to homepage">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 4 54 12v18c0 14-9 24-22 30C19 54 10 44 10 30V12L32 4Z" fill="none" stroke="#13525a" stroke-width="4" stroke-linejoin="round"/>
+        <circle cx="27" cy="28" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+        <path d="M33 34 44 45" stroke="#bf6b3c" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <span class="wordmark">LeakCheck</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="about.html">How it works</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Secret &amp; API-key scanner</p>
+      <h1>Did a secret just sneak into your code?</h1>
+      <p class="lede">Hardcoded keys are the <strong>#1 way projects get popped</strong> — especially AI-generated, vibe-coded ones where a live token slips into a commit unnoticed. Paste your code below and find out <strong>before you ship</strong>.</p>
+
+      <form id="scan-form" class="scanner" novalidate>
+        <label class="code-label" for="code">Your code, <code>.env</code>, or config</label>
+        <textarea id="code" name="code" class="code-input" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" wrap="off" placeholder="Paste your code, .env, or config here&hellip;" aria-describedby="trust-line"></textarea>
+
+        <div class="scan-actions">
+          <button type="submit" id="scan-btn" class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            Scan for secrets
+          </button>
+          <button type="button" id="example-btn" class="btn">Try an example</button>
+          <button type="button" id="clear-btn" class="btn ghost">Clear</button>
+        </div>
+
+        <p class="trust-badge" id="trust-line">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <span><strong>100% in your browser</strong> — your code never leaves this tab. No upload. No signup.</span>
+        </p>
+      </form>
+    </div>
+  </section>
+
+  <section id="results" class="results" hidden tabindex="-1" aria-label="Scan results">
+    <!-- app.js fills this and injects the "Copy report" #copy-btn into the results head -->
+  </section>
+
+  <section class="detect">
+    <div class="wrap">
+      <p class="eyebrow">What we detect</p>
+      <h2 class="detect-title">40+ secret patterns</h2>
+      <p class="detect-sub">From cloud providers to AI APIs, payment keys to private certs — if it looks like a credential, LeakCheck flags it.</p>
+      <ul class="detect-grid">
+        <li class="feature"><span class="feat-icon" aria-hidden="true">AWS</span><div><h3>AWS</h3><p>Access key IDs &amp; secret access keys.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">$</span><div><h3>Stripe</h3><p>Live &amp; restricted secret keys.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">AI</span><div><h3>OpenAI &amp; Anthropic</h3><p>sk- and API tokens for both.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">git</span><div><h3>GitHub &amp; GitLab</h3><p>Personal access &amp; OAuth tokens.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">G</span><div><h3>Google</h3><p>API keys &amp; OAuth client secrets.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">msg</span><div><h3>Slack / Twilio / SendGrid</h3><p>Bot, account &amp; mail tokens.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">PEM</span><div><h3>Private keys</h3><p>RSA, EC &amp; OpenSSH PEM blocks.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">DB</span><div><h3>Database URLs</h3><p>Postgres, MySQL, Mongo with creds.</p></div></li>
+        <li class="feature"><span class="feat-icon" aria-hidden="true">JWT</span><div><h3>JWTs</h3><p>Signed JSON Web Tokens in source.</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="steps">
+    <div class="wrap">
+      <p class="eyebrow">How it works</p>
+      <h2 class="steps-title">Three steps, zero uploads</h2>
+      <ol class="step-grid">
+        <li class="step">
+          <span class="step-num" aria-hidden="true">1</span>
+          <h3>Paste</h3>
+          <p>Drop in code, a <code>.env</code> file, or any config you're about to commit.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" aria-hidden="true">2</span>
+          <h3>Scanned in your browser</h3>
+          <p>40+ patterns run locally in JavaScript. Nothing is sent to a server.</p>
+        </li>
+        <li class="step">
+          <span class="step-num" aria-hidden="true">3</span>
+          <h3>Masked findings + how to fix</h3>
+          <p>Each hit is shown by severity with the value masked and a fix to follow.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="faq">
+    <div class="wrap narrow">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="faq-title">Questions, answered</h2>
+
+      <details>
+        <summary>Is it safe to paste secrets here?</summary>
+        <p>Yes. LeakCheck runs <strong>entirely in your browser</strong> — your code is never sent over the network, uploaded, logged, or stored. The scan happens locally in JavaScript on this page. That said, if a secret was already committed or shared, treat it as compromised and <strong>rotate it</strong> regardless of what this tool finds.</p>
+      </details>
+
+      <details>
+        <summary>Does it store my code?</summary>
+        <p>No. Nothing is persisted. Your pasted text lives only in this tab's memory and disappears the moment you close or reload the page. There's no database, no analytics on your content, and no signup.</p>
+      </details>
+
+      <details>
+        <summary>What about false negatives?</summary>
+        <p>LeakCheck uses heuristic pattern matching, so it can miss custom or obfuscated secrets, and it may occasionally flag something harmless. It's a fast first line of defense — not a guarantee. Pair it with a CI secret scanner and good <code>.gitignore</code> hygiene for full coverage.</p>
+      </details>
+
+      <details>
+        <summary>A key leaked — what now?</summary>
+        <p><strong>Rotate it immediately</strong> in the provider's dashboard so the exposed value stops working. Then scrub it from your git history (the secret stays in old commits even after you delete the line) using a tool like <code>git filter-repo</code> or BFG, and force-push the cleaned history. Assume anything that ever hit a public repo is already harvested.</p>
+      </details>
+
+      <details>
+        <summary>Can I run this in CI?</summary>
+        <p>A <strong>pre-commit hook + CI ruleset pack</strong> is coming — catch leaks automatically on every commit and pull request, before they ever reach your remote. Want it for your team? <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a></p>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="wrap foot">
+    <div>
+      <a class="brand small" href="./" aria-label="LeakCheck — homepage">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M32 4 54 12v18c0 14-9 24-22 30C19 54 10 44 10 30V12L32 4Z" fill="none" stroke="#cbd2da" stroke-width="4" stroke-linejoin="round"/>
+          <circle cx="27" cy="28" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+          <path d="M33 34 44 45" stroke="#bf6b3c" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <span class="wordmark">LeakCheck</span>
+      </a>
+      <p class="fine">Heuristic detection, not a security guarantee.</p>
+    </div>
+    <nav class="foot-nav" aria-label="Footer navigation">
+      <a href="about.html">How it works</a>
+      <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
+    </nav>
+  </div>
+  <div class="wrap">
+    <p class="madeby">A <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Copper Bay Labs</a> product.</p>
+  </div>
+</footer>
+
+<script src="app.js?v=2"></script>
+</body>
+</html>

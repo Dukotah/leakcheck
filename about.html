@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How LeakCheck works — methodology & privacy</title>
+<meta name="description" content="How LeakCheck detects exposed API keys and secrets entirely in your browser: named provider patterns, entropy heuristics, masking, the client-side privacy guarantee, and what to do if you find a leaked key.">
+<link rel="canonical" href="https://dukotah.github.io/leakcheck/about.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="LeakCheck">
+<meta property="og:title" content="How LeakCheck works — methodology & privacy">
+<meta property="og:description" content="Named provider patterns + entropy heuristics, run entirely in your browser. Nothing is uploaded. Plus: what to do if you find a leaked key.">
+<meta property="og:url" content="https://dukotah.github.io/leakcheck/about.html">
+<meta property="og:image" content="https://dukotah.github.io/leakcheck/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#faf8f4">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"TechArticle","headline":"How LeakCheck works — methodology & privacy","description":"How LeakCheck detects exposed API keys and secrets entirely in your browser using named provider patterns and entropy heuristics, how it masks matches, and what to do if you find a leaked key.","author":{"@type":"Organization","name":"Copper Bay Labs","url":"https://copperbaytech.com"},"publisher":{"@type":"Organization","name":"Copper Bay Labs","url":"https://copperbaytech.com"},"mainEntityOfPage":"https://dukotah.github.io/leakcheck/about.html"}
+</script>
+<link rel="stylesheet" href="styles.css?v=2">
+<style>
+  /* about-page extras, built on the base tokens */
+  .doc .lede{font-size:clamp(17px,2.3vw,20px);color:var(--muted)}
+  .doc h2{scroll-margin-top:80px}
+  .doc h3{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:19px;margin:22px 0 6px;letter-spacing:-.01em}
+  .toc{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 6px;padding:0;list-style:none}
+  .toc a{display:inline-block;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;color:var(--muted)}
+  .toc a:hover{border-color:var(--bay);color:var(--ink);text-decoration:none}
+
+  /* detection table */
+  .tbl-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+  table.detect{width:100%;border-collapse:collapse;background:var(--surface);font-size:15px;min-width:560px}
+  table.detect th,table.detect td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line-2);vertical-align:top}
+  table.detect thead th{font-family:"Hanken Grotesk",sans-serif;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);background:var(--paper)}
+  table.detect tbody tr:last-child td{border-bottom:none}
+  table.detect code{font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;font-size:13px;background:var(--line-2);padding:2px 6px;border-radius:5px;color:#2c2f36;white-space:nowrap}
+  .sev{display:inline-block;font-weight:700;font-size:12px;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:6px}
+  .sev.fail{background:var(--fail-bg);color:var(--fail)}
+  .sev.warn{background:var(--warn-bg);color:var(--warn)}
+  .sev.pass{background:var(--pass-bg);color:var(--pass)}
+
+  .callout.warn-callout{background:var(--fail-bg);border-left-color:var(--fail);color:#5e2019}
+  .steps{margin:18px 0;padding-left:0;list-style:none;counter-reset:step}
+  .steps>li{position:relative;padding:4px 0 16px 46px;counter-increment:step}
+  .steps>li::before{content:counter(step);position:absolute;left:0;top:2px;width:30px;height:30px;border-radius:50%;background:var(--copper);color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;font-family:"Fraunces",serif}
+  .steps>li strong{display:block;margin-bottom:2px}
+  .doc code.inline{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--line-2);padding:2px 6px;border-radius:5px}
+  .roadmap-note{background:var(--copper-tint);border-radius:12px;padding:16px 20px;margin:22px 0;border:1px solid #efd9c6}
+  .roadmap-note strong{color:var(--copper-deep)}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="masthead" role="banner">
+  <div class="wrap hdr-bar">
+    <a class="brand" href="./" aria-label="LeakCheck — go to homepage">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 4 54 12 V30 C54 44 45 54 32 60 C19 54 10 44 10 30 V12 Z" fill="#bf6b3c"/>
+        <path d="M32 10 48 16 V30 C48 41 41.5 49 32 54 C22.5 49 16 41 16 30 V16 Z" fill="#14181f"/>
+        <circle cx="32" cy="28" r="6" fill="#faf8f4"/>
+        <path d="M29.6 31.5 H34.4 L36 44 H28 Z" fill="#faf8f4"/>
+        <circle cx="42" cy="40" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+        <line x1="48.4" y1="46.4" x2="56" y2="54" stroke="#bf6b3c" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <span class="wordmark">LeakCheck</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="about.html" aria-current="page">How it works</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<article class="doc">
+  <div class="wrap narrow">
+    <p class="eyebrow" style="text-align:left">Methodology &amp; privacy</p>
+    <h1>How LeakCheck works</h1>
+    <p class="lede">LeakCheck scans the text you paste for things that look like API keys, tokens, and private keys — and it does the whole job inside your browser. This page explains exactly how that detection works, what it can and can’t see, and what to do the moment you find a real leak.</p>
+
+    <ul class="toc" aria-label="On this page">
+      <li><a href="#privacy">Privacy guarantee</a></li>
+      <li><a href="#detect">What we detect</a></li>
+      <li><a href="#how">How detection works</a></li>
+      <li><a href="#masking">Masking</a></li>
+      <li><a href="#disclaimer">Not a security audit</a></li>
+      <li><a href="#leaked">I found a leaked key</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+    </ul>
+
+    <h2 id="privacy">The privacy guarantee: nothing leaves your browser</h2>
+    <p>This is the part that matters most, so we’ll be blunt about it: <strong>LeakCheck has no backend.</strong> When you paste code, a <code class="inline">.env</code> file, or config into the scanner, every byte stays on your machine. The scanning happens in JavaScript, locally, in the same tab you’re looking at.</p>
+    <p>Concretely, that means:</p>
+    <ul>
+      <li><strong>No network requests with your content.</strong> Your code and secrets are never uploaded, POSTed, beaconed, or sent to any server — ours or anyone else’s.</li>
+      <li><strong>No logging or storage.</strong> We don’t keep what you paste. It isn’t written to a database, a log file, local storage, or analytics. Close or reload the tab and it’s gone.</li>
+      <li><strong>It works offline.</strong> Load the page once, disconnect from the internet, and the scanner still runs. That’s the simplest proof there’s nothing to upload to.</li>
+    </ul>
+    <div class="callout">
+      <strong>Verify it yourself.</strong> Open your browser’s developer tools, switch to the Network tab, and run a scan. You won’t see a request carrying your input — because there isn’t one. The only network activity on the whole site is loading the page, its stylesheet, the script, and the web fonts.
+    </div>
+    <p>We built it this way on purpose. A tool that asks you to paste your secrets somewhere, and then ships those secrets to a server, is a worse problem than the one it claims to solve. LeakCheck never puts you in that position.</p>
+
+    <h2 id="detect">What we detect</h2>
+    <p>LeakCheck ships with a library of named patterns for common providers, plus a general high-entropy catch-all for credentials that don’t match a known format. Severity reflects how dangerous an exposure typically is — a live cloud or payment key is a <span class="sev fail">Fail</span>, a lower-blast-radius or context-dependent token is a <span class="sev warn">Warn</span>, and informational matches are <span class="sev pass">Pass</span>.</p>
+    <div class="tbl-wrap">
+      <table class="detect">
+        <thead>
+          <tr><th scope="col">Provider / type</th><th scope="col">Example format</th><th scope="col">Severity</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>AWS access key ID</td><td><code>AKIA0123456789ABCDEF</code></td><td><span class="sev fail">Fail</span></td></tr>
+          <tr><td>AWS secret access key</td><td><code>40-char base64-ish secret</code></td><td><span class="sev fail">Fail</span></td></tr>
+          <tr><td>Stripe live secret key</td><td><code>sk_live_…</code></td><td><span class="sev fail">Fail</span></td></tr>
+          <tr><td>Private key block (RSA/EC/PGP)</td><td><code>-----BEGIN … PRIVATE KEY-----</code></td><td><span class="sev fail">Fail</span></td></tr>
+          <tr><td>GitHub token</td><td><code>ghp_… / github_pat_…</code></td><td><span class="sev fail">Fail</span></td></tr>
+          <tr><td>OpenAI / Anthropic API key</td><td><code>sk-… / sk-ant-…</code></td><td><span class="sev fail">Fail</span></td></tr>
+          <tr><td>Google API key</td><td><code>AIza…</code></td><td><span class="sev warn">Warn</span></td></tr>
+          <tr><td>Slack token</td><td><code>xoxb-… / xoxp-…</code></td><td><span class="sev warn">Warn</span></td></tr>
+          <tr><td>Stripe test secret key</td><td><code>sk_test_…</code></td><td><span class="sev warn">Warn</span></td></tr>
+          <tr><td>JSON Web Token (JWT)</td><td><code>eyJ….eyJ….&lt;sig&gt;</code></td><td><span class="sev warn">Warn</span></td></tr>
+          <tr><td>Generic <code>SECRET=</code> / <code>PASSWORD=</code> assignment</td><td><code>API_SECRET="…"</code></td><td><span class="sev warn">Warn</span></td></tr>
+          <tr><td>High-entropy string (unmatched)</td><td><code>random 32+ char blob</code></td><td><span class="sev pass">Pass</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine" style="color:var(--muted-2)">The exact pattern set evolves; treat this table as representative, not exhaustive. Severities are defaults and reflect typical blast radius, not your specific setup.</p>
+
+    <h2 id="how">How detection works</h2>
+    <p>Detection runs in two complementary passes:</p>
+    <h3>1. Named regular-expression patterns</h3>
+    <p>Most cloud providers give their credentials a recognizable shape — a fixed prefix, a known length, a specific alphabet. LeakCheck carries a curated set of regular expressions for those formats (for example, <code class="inline">AKIA</code> followed by 16 base-32 characters for AWS, or <code class="inline">sk_live_</code> for Stripe). When the text matches a named pattern, the finding is precise: we can tell you which provider it belongs to and assign a meaningful severity.</p>
+    <h3>2. Entropy heuristics</h3>
+    <p>Plenty of secrets don’t follow a public format — bespoke session tokens, hand-rolled API keys, raw passwords. For those, LeakCheck measures <strong>Shannon entropy</strong>: a score of how random and unpredictable a string is. Ordinary English words and code identifiers have low entropy; a genuinely random 32-character credential has high entropy. Long, high-entropy strings — especially ones sitting next to a tell like <code class="inline">key</code>, <code class="inline">token</code>, <code class="inline">secret</code>, or <code class="inline">=</code> — get surfaced even when no named pattern matches.</p>
+    <p>The two passes back each other up: named patterns give you accuracy on the providers we know, and entropy gives you coverage on the ones we don’t.</p>
+
+    <h2 id="masking">How matches are masked</h2>
+    <p>When LeakCheck shows you a finding, it does <em>not</em> print the full secret back onto the screen. Each match is masked — typically the leading few characters of the prefix are shown for identification and the rest is replaced with dots (for example, <code class="inline">sk_live_4eC•••••••••••••••••••</code>). This keeps the results readable and identifiable while reducing the chance of shoulder-surfing, an accidental screenshot, or a copied screen-share leaking the very thing you’re trying to protect. The unmasked value never leaves your browser regardless, but masking means it isn’t casually visible even to you.</p>
+
+    <h2 id="disclaimer">This is heuristic detection — not a security audit</h2>
+    <div class="callout warn-callout">
+      <strong>Important:</strong> LeakCheck is a fast heuristic scanner, <strong>not a security guarantee, certification, or audit.</strong> A clean result does not mean your code is secure, and a flagged result does not always mean a real secret.
+    </div>
+    <p>Like every pattern-based scanner, LeakCheck can produce both kinds of error:</p>
+    <ul>
+      <li><strong>False negatives.</strong> Secrets in formats we don’t recognize, encoded or split across lines, or below the entropy threshold can slip past unflagged.</li>
+      <li><strong>False positives.</strong> Random-looking but harmless strings — hashes, UUIDs, test fixtures, example keys — can be flagged when they aren’t real credentials.</li>
+    </ul>
+    <p>Use LeakCheck as a quick first pass before you commit or share code, not as the final word on whether your project is safe. A real audit considers your architecture, dependencies, access controls, and threat model — none of which a text scanner can see. If you need that level of assurance, <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">talk to Copper Bay Labs</a>.</p>
+
+    <h2 id="leaked">I found a leaked key — now what?</h2>
+    <p>If a real credential has been exposed, assume the worst and act fast. Treat the order below as a checklist:</p>
+    <ol class="steps">
+      <li><strong>Rotate it immediately.</strong> Go to the provider’s dashboard and revoke or regenerate the key right now. Rotation is the only action that actually stops abuse — deleting it from your code does not.</li>
+      <li><strong>Remove it from your code.</strong> Take the hard-coded value out of every source file, config, and notebook where it appears.</li>
+      <li><strong>Move it to an environment variable or secret manager.</strong> Load secrets at runtime from <code class="inline">.env</code> (git-ignored) for local work, and from a real secret manager — AWS Secrets Manager, GCP Secret Manager, Vault, GitHub Actions secrets, your platform’s vault — for anything deployed.</li>
+      <li><strong>Scrub it from git history.</strong> A removed-then-committed secret still lives in every prior commit. Rewrite history with <a href="https://github.com/newren/git-filter-repo" target="_blank" rel="noopener noreferrer"><code class="inline">git filter-repo</code></a> or <a href="https://rtyley.github.io/bfg-repo-cleaner/" target="_blank" rel="noopener noreferrer">BFG Repo-Cleaner</a>, then force-push and have collaborators re-clone. Remember any forks and PRs may still carry it.</li>
+      <li><strong>Treat the old key as compromised forever.</strong> Once a secret has been public — even briefly, even in a private repo that was shared — assume it’s in someone’s scrape. The exposed value can never be trusted again. The rotated key is your real key; the old one is dead.</li>
+    </ol>
+    <div class="callout">
+      <strong>Order matters.</strong> Rotate <em>first</em>. Cleaning git history is important for hygiene, but it does nothing to protect a key that’s already been copied. Revoking access is what actually closes the door.
+    </div>
+
+    <h2 id="roadmap">On the roadmap</h2>
+    <div class="roadmap-note">
+      <p style="margin:0"><strong>Pre-commit &amp; CI ruleset pack.</strong> The best place to catch a secret is before it’s ever committed. We’re packaging LeakCheck’s patterns into a drop-in ruleset for pre-commit hooks and CI pipelines, so the same detection that runs here can block secrets at the door of your repo — automatically, on every push. Stay tuned.</p>
+    </div>
+
+    <p style="margin-top:30px"><a class="btn primary" href="./">Scan your code now</a></p>
+  </div>
+</article>
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="wrap foot">
+    <div>
+      <a class="brand small" href="./" aria-label="LeakCheck — homepage">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M32 4 54 12 V30 C54 44 45 54 32 60 C19 54 10 44 10 30 V12 Z" fill="#bf6b3c"/>
+          <path d="M32 10 48 16 V30 C48 41 41.5 49 32 54 C22.5 49 16 41 16 30 V16 Z" fill="#14181f"/>
+          <circle cx="32" cy="28" r="6" fill="#faf8f4"/>
+          <path d="M29.6 31.5 H34.4 L36 44 H28 Z" fill="#faf8f4"/>
+          <circle cx="42" cy="40" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+          <line x1="48.4" y1="46.4" x2="56" y2="54" stroke="#bf6b3c" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+        <span class="wordmark">LeakCheck</span>
+      </a>
+      <p class="fine">Heuristic detection, not a security guarantee.</p>
+    </div>
+    <nav class="foot-nav" aria-label="Footer navigation">
+      <a href="about.html">How it works</a>
+      <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
+    </nav>
+  </div>
+  <div class="wrap">
+    <p class="madeby">A <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Copper Bay Labs</a> product.</p>
+  </div>
+</footer>
+</body>
+</html>
