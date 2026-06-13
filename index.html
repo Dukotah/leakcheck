@@ -41,6 +41,7 @@
     </a>
     <nav class="nav" aria-label="Primary navigation">
       <a href="about.html">How it works</a>
+      <a href="guides/accidentally-committed-api-key-github.html">Guides</a>
     </nav>
   </div>
 </header>
@@ -143,7 +144,7 @@
 
       <details>
         <summary>A key leaked — what now?</summary>
-        <p><strong>Rotate it immediately</strong> in the provider's dashboard so the exposed value stops working. Then scrub it from your git history (the secret stays in old commits even after you delete the line) using a tool like <code>git filter-repo</code> or BFG, and force-push the cleaned history. Assume anything that ever hit a public repo is already harvested.</p>
+        <p><strong>Rotate it immediately</strong> in the provider's dashboard so the exposed value stops working. Then scrub it from your git history (the secret stays in old commits even after you delete the line) using a tool like <code>git filter-repo</code> or BFG, and force-push the cleaned history. Assume anything that ever hit a public repo is already harvested. <a href="guides/accidentally-committed-api-key-github.html">Full step-by-step guide: per-provider rotation, history cleanup, and prevention &rarr;</a></p>
       </details>
 
       <details>
@@ -181,6 +182,7 @@
     </div>
     <nav class="foot-nav" aria-label="Footer navigation">
       <a href="about.html">How it works</a>
+      <a href="guides/accidentally-committed-api-key-github.html">Fix guides</a>
       <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
     </nav>
   </div>

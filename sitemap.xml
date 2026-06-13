@@ -10,4 +10,10 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+  <url>
+    <loc>https://labs.copperbaytech.com/leakcheck/guides/accidentally-committed-api-key-github.html</loc>
+    <changefreq>monthly</changefreq>
+    <lastmod>2026-06-13</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>

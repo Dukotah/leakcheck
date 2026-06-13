@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accidentally Committed an API Key to GitHub — What to Do Right Now</title>
+<meta name="description" content="Pushed an API key or secret to GitHub? Act fast: bots scrape public commits within seconds. This guide covers the exact steps — rotate first, then scrub git history, prevent recurrence.">
+<link rel="canonical" href="https://labs.copperbaytech.com/leakcheck/guides/accidentally-committed-api-key-github.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="LeakCheck">
+<meta property="og:title" content="Accidentally Committed an API Key to GitHub — What to Do Right Now">
+<meta property="og:description" content="Rotate the key first, then scrub git history with git-filter-repo or BFG. Step-by-step remediation guide for accidentally exposed API keys and secrets.">
+<meta property="og:url" content="https://labs.copperbaytech.com/leakcheck/guides/accidentally-committed-api-key-github.html">
+<meta property="og:image" content="https://labs.copperbaytech.com/leakcheck/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#faf8f4">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"TechArticle","headline":"Accidentally Committed an API Key to GitHub — What to Do Right Now","description":"Step-by-step remediation guide for an API key or secret accidentally committed to a GitHub repository: rotate the credential immediately, audit what else leaked, remove from codebase, rewrite git history, and prevent recurrence.","author":{"@type":"Organization","name":"Copper Bay Labs","url":"https://copperbaytech.com"},"publisher":{"@type":"Organization","name":"Copper Bay Labs","url":"https://copperbaytech.com"},"datePublished":"2026-06-13","dateModified":"2026-06-13","mainEntityOfPage":"https://labs.copperbaytech.com/leakcheck/guides/accidentally-committed-api-key-github.html","mainEntity":{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does removing a file from GitHub delete it from the commit history?","acceptedAnswer":{"@type":"Answer","text":"No. Deleting a file creates a new commit that removes it from the working tree, but all previous commits still contain the file intact. Anyone can check out an old commit and read the value. Use git filter-repo or BFG Repo-Cleaner to rewrite history."}},{"@type":"Question","name":"How quickly do bots find a leaked API key in a GitHub commit?","acceptedAnswer":{"@type":"Answer","text":"Within seconds to minutes. Automated harvesters maintain persistent connections to the GitHub Events API, which exposes every public push in real time. Researchers have documented credential collection in under 60 seconds of a new commit landing."}},{"@type":"Question","name":"What if the repository was private?","acceptedAnswer":{"@type":"Answer","text":"A private repo significantly reduces exposure — automated harvesters target public pushes. But it is not zero risk: collaborators already have those commits locally, and if the repo was ever briefly public it may have been harvested. Rotate the key anyway."}},{"@type":"Question","name":"GitHub said it auto-revoked my key — am I safe?","acceptedAnswer":{"@type":"Answer","text":"GitHub's partner integrations automatically revoke some keys for certain providers. Even so, manually confirm the key is inactive in the provider's dashboard and check for any unexpected charges or access that may have occurred before revocation."}},{"@type":"Question","name":"I pushed to a fork, not the original repo. Do I still need to clean history?","acceptedAnswer":{"@type":"Answer","text":"Yes. A fork has its own full copy of git history. Clean and force-push the fork independently using git filter-repo or BFG."}}]}}
+</script>
+<link rel="stylesheet" href="../styles.css?v=2">
+<style>
+  .doc .lede{font-size:clamp(17px,2.3vw,20px);color:var(--muted)}
+  .doc h2{scroll-margin-top:80px}
+  .doc h3{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:19px;margin:22px 0 6px;letter-spacing:-.01em}
+  .toc{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 6px;padding:0;list-style:none}
+  .toc a{display:inline-block;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;color:var(--muted)}
+  .toc a:hover{border-color:var(--bay);color:var(--ink);text-decoration:none}
+  .callout.warn-callout{background:var(--fail-bg);border-left-color:var(--fail);color:#5e2019}
+  .callout.tip-callout{background:var(--pass-bg);border-left-color:var(--pass);color:#1b4d30}
+  .steps{margin:18px 0;padding-left:0;list-style:none;counter-reset:step}
+  .steps>li{position:relative;padding:4px 0 20px 46px;counter-increment:step}
+  .steps>li::before{content:counter(step);position:absolute;left:0;top:2px;width:30px;height:30px;border-radius:50%;background:var(--copper);color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;font-family:"Fraunces",serif}
+  .steps>li strong{display:block;margin-bottom:4px}
+  .doc code.inline{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--line-2);padding:2px 6px;border-radius:5px}
+  pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:12px 0}
+  pre code{background:none;padding:0;font-size:inherit}
+  .provider-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:18px 0}
+  .provider-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .provider-card h3{margin:0 0 6px;font-size:16px;font-family:"Fraunces",Georgia,serif;font-weight:600}
+  .provider-card p{font-size:14px;color:var(--muted);margin:0}
+  .suite{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0 6px}
+  .suite a{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s,border-color .15s}
+  .suite a:hover{text-decoration:none;box-shadow:var(--shadow-lift);transform:translateY(-2px);border-color:var(--line-2)}
+  .suite .s-name{font-family:"Fraunces",serif;font-weight:600;font-size:17px;color:var(--ink);display:block;margin:0 0 4px}
+  .suite p{color:var(--muted);font-size:14px;margin:0}
+  .suite .s-tag{display:inline-block;margin-bottom:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--bay);background:var(--bay-tint,#e8f4f6);border:1px solid #cfe1e3;border-radius:6px;padding:2px 8px}
+  .faq-section{margin:18px 0}
+  .faq-section details{border-bottom:1px solid var(--line);padding:14px 0}
+  .faq-section details:first-child{border-top:1px solid var(--line)}
+  .faq-section summary{font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .faq-section summary::-webkit-details-marker{display:none}
+  .faq-section summary::after{content:"+";font-size:20px;color:var(--muted);flex-shrink:0}
+  .faq-section details[open] summary::after{content:"\2212"}
+  .faq-section details p,.faq-section details ul{margin:12px 0 4px;color:var(--muted)}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="masthead" role="banner">
+  <div class="wrap hdr-bar">
+    <a class="brand" href="../" aria-label="LeakCheck — go to homepage">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 4 54 12v18c0 14-9 24-22 30C19 54 10 44 10 30V12L32 4Z" fill="none" stroke="#13525a" stroke-width="4" stroke-linejoin="round"/>
+        <circle cx="27" cy="28" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+        <path d="M33 34 44 45" stroke="#bf6b3c" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <span class="wordmark">LeakCheck</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="../about.html">How it works</a>
+      <a href="../">Scan your code</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<article class="doc">
+  <div class="wrap narrow">
+    <p class="eyebrow" style="text-align:left">Remediation guide</p>
+    <h1>Accidentally committed an API key to GitHub — what to do right now</h1>
+    <p class="lede">You pushed a commit and spotted a secret in the diff — or GitHub Secret Scanning just fired an alert. Either way, the window for acting is already short. Automated harvesters maintain persistent connections to the GitHub Events API, which exposes every public push in real time, and researchers have documented credential collection within 60 seconds of a new commit landing. Here is the exact sequence of steps, in the order they matter.</p>
+
+    <div class="callout warn-callout">
+      <strong>Rotate first. Read the rest after.</strong> The only action that makes a stolen key stop working is revoking it at the source. Rewriting git history, deleting the file, and closing the browser tab do nothing for a secret that is already in someone else's hands. Jump to <a href="#rotate" style="color:inherit;text-decoration:underline">Step 1</a> now.
+    </div>
+
+    <ul class="toc" aria-label="On this page">
+      <li><a href="#how-fast">How fast bots find leaked keys</a></li>
+      <li><a href="#rotate">Step 1: Rotate the key</a></li>
+      <li><a href="#audit">Step 2: Audit what else leaked</a></li>
+      <li><a href="#remove">Step 3: Remove from codebase</a></li>
+      <li><a href="#git-history">Step 4: Scrub git history</a></li>
+      <li><a href="#secret-scanning">Step 5: Check GitHub's alerts</a></li>
+      <li><a href="#prevention">Prevention</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+
+    <h2 id="how-fast">How fast can bots find a leaked key in a GitHub commit?</h2>
+    <p>Within seconds to a few minutes for public repositories. The GitHub Events API streams every push to any unauthenticated consumer in near real time, and dedicated credential harvesters — run by both security researchers and malicious actors — maintain persistent connections to it around the clock. One widely-cited 2019 study found that valid AWS keys started receiving unauthorized requests within 0.5–4 minutes of being pushed. The landscape has only gotten more aggressive since.</p>
+    <p>Private repositories are meaningfully safer but not safe: anyone who has already cloned the repo holds a local copy of those commits, and a repository that was public for even a brief moment may have been captured. The correct response is the same regardless of visibility: revoke the key and assume it has been collected.</p>
+
+    <h2 id="rotate">Step 1: Revoke or rotate the key immediately</h2>
+    <p>Go to the issuing service's dashboard and revoke or regenerate the exposed credential before doing anything else. Deleting the file from the repo does not invalidate a key that has already been scraped; only the issuing service can do that.</p>
+
+    <div class="provider-grid">
+      <div class="provider-card">
+        <h3>AWS</h3>
+        <p>IAM console → Users → Security credentials → delete the compromised access key, create a new one. If it was a root account key, revoke it immediately and create a scoped IAM user instead.</p>
+      </div>
+      <div class="provider-card">
+        <h3>OpenAI / Anthropic</h3>
+        <p>Platform dashboard → API Keys → delete the old key, generate a replacement. The old key is invalidated at the moment of deletion.</p>
+      </div>
+      <div class="provider-card">
+        <h3>Stripe</h3>
+        <p>Dashboard → Developers → API keys → Roll the secret key (the <code class="inline">sk_live_</code> or <code class="inline">sk_test_</code> value). Rolling invalidates the old key and issues a new one.</p>
+      </div>
+      <div class="provider-card">
+        <h3>GitHub tokens</h3>
+        <p>Settings → Developer settings → Personal access tokens → Revoke, then create a new token with only the scopes actually needed.</p>
+      </div>
+      <div class="provider-card">
+        <h3>Supabase</h3>
+        <p>Project Settings → API → Reset the <code class="inline">service_role</code> key. The <code class="inline">anon</code> key is designed to be public, but reset it too if it was in the same file.</p>
+      </div>
+      <div class="provider-card">
+        <h3>Twilio / SendGrid</h3>
+        <p>Twilio Console → API Keys → revoke. SendGrid → Settings → API Keys → delete. Create replacements with narrower scopes.</p>
+      </div>
+      <div class="provider-card">
+        <h3>Google Cloud</h3>
+        <p>APIs &amp; Services → Credentials → delete the API key, create a new one. If it's an OAuth client secret, regenerate it under the same OAuth client.</p>
+      </div>
+      <div class="provider-card">
+        <h3>Database URLs with passwords</h3>
+        <p>Reset the password for the database user in the connection string (<code class="inline">ALTER USER youruser WITH PASSWORD 'new_pw';</code> for Postgres). Update all references: CI secrets, other services, other env files.</p>
+      </div>
+    </div>
+
+    <div class="callout tip-callout">
+      <strong>Update downstream references after rotating.</strong> A new key that you haven't deployed yet is just a new outage. After generating the replacement, update every place the old key was used: GitHub Actions secrets, hosting platform environment variables (Vercel, Netlify, Railway, Render, Fly.io), CI/CD pipelines, and any third-party integrations that called the same service.
+    </div>
+
+    <h2 id="audit">Step 2: Audit what else may have leaked</h2>
+    <p>While you have the affected file open, check whether other secrets were in the same commit or in nearby files that were part of the same push. It is common to find a cluster of credentials in a single <code class="inline">.env</code> or config file — fixing one and missing the others leaves you partially exposed.</p>
+    <p>Paste the affected file or the entire commit diff into LeakCheck. It runs 40+ credential patterns — AWS, Stripe, OpenAI, Anthropic, GitHub, Twilio, Google, database URLs, JWTs, PEM blocks, and more — entirely in your browser. Your code is never uploaded.</p>
+
+    <p style="margin:24px 0 8px"><a class="btn primary" href="../">Check your code with LeakCheck &rarr;</a></p>
+
+    <h2 id="remove">Step 3: Remove the key from your codebase</h2>
+    <p>With the key rotated and all related secrets audited, remove the raw value from every source file it appears in. Replace hardcoded values with environment-variable references:</p>
+    <pre><code># Before (hardcoded — do not do this)
+const client = new Stripe("sk_live_ACTUALKEY");
+
+# After (reads from environment at runtime)
+const client = new Stripe(process.env.STRIPE_SECRET_KEY);</code></pre>
+    <p>At the same time, ensure the file that contained the secret is in <code class="inline">.gitignore</code>:</p>
+    <pre><code># Add to .gitignore
+.env
+.env.local
+.env.*.local
+config/secrets.yml
+*.pem</code></pre>
+    <p>Verify git is actually honoring the ignore rule: run <code class="inline">git status</code>. If the file still appears under "Changes not staged for commit," it is already tracked — run <code class="inline">git rm --cached .env</code> to un-track it before adding it to <code class="inline">.gitignore</code>.</p>
+    <p>Commit and push this change. That removes the secret from the tip of the branch — but not from history. That is the next step.</p>
+
+    <h2 id="git-history">Step 4: Scrub the secret from git history</h2>
+    <p>Deleting a line and committing the change removes the secret from the current working tree, but leaves it intact in every historical commit that ever contained it. Anyone with read access to the repo can run <code class="inline">git checkout &lt;old-sha&gt; -- .env</code> and read the original value. To actually expunge it, you need to rewrite the repository's commit graph.</p>
+
+    <h3>Option A: git-filter-repo (recommended)</h3>
+    <p><code class="inline">git filter-repo</code> is the Git-project-endorsed replacement for the deprecated <code class="inline">git filter-branch</code>. It is significantly faster and safer.</p>
+    <pre><code># Install (requires Python 3)
+pip install git-filter-repo
+
+# Remove a specific file from every commit in every branch
+git filter-repo --path .env --invert-paths --force
+
+# Or replace a specific secret string value with a placeholder
+# (useful when the secret was inline in a source file, not a standalone file)
+printf 'sk_live_YOURKEY==>***REMOVED***\n' > /tmp/replacements.txt
+git filter-repo --replace-text /tmp/replacements.txt --force
+
+# Force-push the rewritten history
+git push origin --force --all
+git push origin --force --tags</code></pre>
+
+    <h3>Option B: BFG Repo-Cleaner (Java)</h3>
+    <p>BFG is faster than filter-branch for large repositories and requires only a JVM rather than Python. It operates on a bare clone.</p>
+    <pre><code># Download bfg.jar from https://rtyley.github.io/bfg-repo-cleaner/
+# Clone a fresh bare copy of your repo
+git clone --mirror git@github.com:yourorg/yourrepo.git
+
+# Remove a file from all history
+java -jar bfg.jar --delete-files .env yourrepo.git
+
+# Or delete all text matching a secret value
+java -jar bfg.jar --replace-text replacements.txt yourrepo.git
+
+# Clean up and force-push
+cd yourrepo.git
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+git push --force</code></pre>
+
+    <div class="callout warn-callout">
+      <strong>All collaborators must re-clone after a force-push.</strong> Rewriting history changes every commit SHA downstream of the affected commit. Anyone with an existing local clone who tries to pull will get a divergence error. They must delete their local copy and clone fresh. Forks on GitHub are separate repositories — you cannot rewrite their history. Notify fork owners, and be aware that GitHub's own internal caches may retain old objects for a period after the push.
+    </div>
+
+    <h2 id="secret-scanning">Step 5: Check GitHub's Secret Scanning alerts</h2>
+    <p>GitHub scans all public repositories for known credential patterns and alerts both the repository owner and — through its <a href="https://docs.github.com/en/code-security/secret-scanning/secret-scanning-partner-patterns" target="_blank" rel="noopener noreferrer">Partner Program</a> — the affected service provider. Some providers automatically invalidate keys GitHub notifies them about, but this is not guaranteed and is not a substitute for manual revocation.</p>
+    <p>Check your repository's Security tab for any open alerts:</p>
+    <pre><code>Your repo → Security tab → Secret scanning alerts</code></pre>
+    <p>For private repositories, secret scanning is available on GitHub Advanced Security (free for public repos, paid for private). If you are not on a paid plan and the repo is private, GitHub will not have scanned it — rely on manual rotation and LeakCheck instead.</p>
+    <p>Even if GitHub auto-revoked the key through a partner integration, verify the key is inactive in the service provider's own dashboard, and check for any unexpected usage or charges that may have occurred in the window before revocation.</p>
+
+    <h2 id="prevention">Prevention: stop this from happening next time</h2>
+    <ul>
+      <li><strong>Add <code class="inline">.env*</code> to <code class="inline">.gitignore</code> before your first commit.</strong> Many framework starters include this already — verify it is there. Confirm with <code class="inline">git check-ignore -v .env</code>; if it prints a match, you are covered.</li>
+      <li><strong>Use environment variables from your hosting platform, not files.</strong> Every modern host — Netlify, Vercel, Railway, Render, Fly.io, Heroku — has a secrets UI. Your code reads <code class="inline">process.env.MY_KEY</code> at runtime; the value is injected by the platform and never written to a file that could end up in the repository.</li>
+      <li><strong>Scan before you commit, not after.</strong> Paste your staged diff or entire <code class="inline">.env</code> into <a href="../">LeakCheck</a> before pushing. For automated coverage, integrate a CLI scanner such as <code class="inline">gitleaks</code> as a pre-commit hook so no secret can reach the remote even by mistake.</li>
+      <li><strong>Limit token scopes to the minimum you actually need.</strong> If a narrow-scope key leaks, the blast radius is smaller: a read-only token cannot make charges; a single-repository token cannot access your other repositories.</li>
+      <li><strong>Rotate secrets on a schedule, not just on incidents.</strong> Regular rotation reduces the value of any key that was harvested at some point without your knowledge.</li>
+      <li><strong>Check your live site, not just your source.</strong> If your build or deploy process accidentally copies config files to the public directory, secrets can end up served over HTTP. <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">ExposureCheck</a> probes your deployed URL for exposed <code class="inline">.env</code>, <code class="inline">.git</code> directories, source maps, and bundled secrets.</li>
+    </ul>
+
+    <h2 id="faq">Frequently asked questions</h2>
+    <div class="faq-section">
+      <details open>
+        <summary>Does removing a file from GitHub delete it from the commit history?</summary>
+        <p>No. Deleting a file creates a new commit that removes it from the current working tree, but every previous commit that ever contained the file still does. The full history is preserved and any user with read access can check out an old commit and read the file. To actually remove it from history, use <code class="inline">git filter-repo</code> or BFG and force-push (see <a href="#git-history">Step 4</a>).</p>
+      </details>
+      <details>
+        <summary>How quickly do bots find a leaked API key in a GitHub commit?</summary>
+        <p>Typically within seconds to a few minutes for public repositories. The GitHub Events API is a public, real-time stream of all push events, and dedicated tools continuously monitor it. A 2019 research paper found unauthorized AWS API calls beginning within 0.5–4 minutes of keys being pushed. Assume any public commit is scanned immediately.</p>
+      </details>
+      <details>
+        <summary>What if the repository was private the whole time?</summary>
+        <p>Private repositories are not monitored by the public Events API, so automated harvesters are very unlikely to have captured the key. However, all collaborators who have cloned the repository already hold a local copy of those commits, and any collaborator who was removed still has their clone. Rotate the key and scrub history anyway — it is 30 minutes of work versus an unknown amount of ongoing risk.</p>
+      </details>
+      <details>
+        <summary>GitHub said it auto-revoked my key through the Partner Program — am I safe?</summary>
+        <p>GitHub's partner integrations revoke secrets automatically for several major providers (AWS, Stripe, GitHub itself, Twilio, and others). Even so, confirm the revocation in the provider's own dashboard — the partner notification can take a few minutes, and there may be a window of exposure. Also check for unexpected API usage, new IAM users, or charges in that window.</p>
+      </details>
+      <details>
+        <summary>I pushed to a fork, not the original repo. Does that change anything?</summary>
+        <p>A fork has its own full copy of git history. If the fork is public, the same automated harvesting risk applies. Clean the fork's history with <code class="inline">git filter-repo</code> or BFG and force-push it independently of the upstream repository.</p>
+      </details>
+      <details>
+        <summary>Can I just make the repository private to fix this?</summary>
+        <p>Making a repository private stops future automated scanning of new commits, but it does not remove the secret from your history, does not invalidate the key, and does not prevent access by anyone who cloned before the visibility change. Rotation is still required, and history cleanup is still strongly recommended.</p>
+      </details>
+    </div>
+
+    <h2 style="margin-top:48px">Also in the Copper Bay Labs ship-safety suite</h2>
+    <p>An accidental secret commit is one of several things to catch before and after shipping. These free tools cover the rest:</p>
+    <div class="suite">
+      <a href="../">
+        <span class="s-tag">Pre-commit</span>
+        <span class="s-name">LeakCheck</span>
+        <p>Paste code, <code class="inline">.env</code>, or a config diff and see every exposed key flagged by severity before it reaches the repo.</p>
+      </a>
+      <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">
+        <span class="s-tag">Post-deploy</span>
+        <span class="s-name">ExposureCheck</span>
+        <p>Scan your live URL for exposed <code class="inline">.env</code> files, <code class="inline">.git</code> directories, source maps, and bundled secrets. Free, no signup.</p>
+      </a>
+      <a href="https://labs.copperbaytech.com/hardencheck/" target="_blank" rel="noopener noreferrer">
+        <span class="s-tag">HTTP hardening</span>
+        <span class="s-name">HardenCheck</span>
+        <p>Check your security headers and Content Security Policy so your site does not become an exfiltration vector after secrets are cleaned up.</p>
+      </a>
+    </div>
+  </div>
+</article>
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="wrap foot">
+    <div>
+      <a class="brand small" href="../" aria-label="LeakCheck — homepage">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M32 4 54 12v18c0 14-9 24-22 30C19 54 10 44 10 30V12L32 4Z" fill="none" stroke="#cbd2da" stroke-width="4" stroke-linejoin="round"/>
+          <circle cx="27" cy="28" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+          <path d="M33 34 44 45" stroke="#bf6b3c" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <span class="wordmark">LeakCheck</span>
+      </a>
+      <p class="fine">Heuristic detection, not a security guarantee.</p>
+    </div>
+    <nav class="foot-nav" aria-label="Footer navigation">
+      <a href="../about.html">How it works</a>
+      <a href="accidentally-committed-api-key-github.html">Fix guides</a>
+      <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">ExposureCheck</a>
+      <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
+    </nav>
+  </div>
+  <div class="wrap">
+    <p class="madeby">A <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Copper Bay Labs</a> product.</p>
+  </div>
+</footer>
+</body>
+</html>
