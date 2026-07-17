@@ -22,4 +22,10 @@
     <lastmod>2026-06-27</lastmod>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://labs.copperbaytech.com/leakcheck/guides/prevent-committing-secrets-pre-commit.html</loc>
+    <changefreq>monthly</changefreq>
+    <lastmod>2026-07-17</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>
