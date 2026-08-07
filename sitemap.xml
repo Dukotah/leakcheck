@@ -28,4 +28,10 @@
     <lastmod>2026-07-17</lastmod>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://labs.copperbaytech.com/leakcheck/guides/find-hardcoded-api-keys-in-codebase.html</loc>
+    <changefreq>monthly</changefreq>
+    <lastmod>2026-08-07</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>

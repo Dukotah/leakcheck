@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Find Hardcoded API Keys in Your Codebase</title>
+<meta name="description" content="Step-by-step guide to auditing source code for hardcoded API keys: browser paste-scan, grep and ripgrep patterns, gitleaks working-tree scan, and Semgrep for CI. For security reviews, open-sourcing, and AI-generated code.">
+<link rel="canonical" href="https://labs.copperbaytech.com/leakcheck/guides/find-hardcoded-api-keys-in-codebase.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="LeakCheck">
+<meta property="og:title" content="How to Find Hardcoded API Keys in Your Codebase">
+<meta property="og:description" content="Grep and ripgrep patterns, gitleaks --no-git for a working-tree scan, and Semgrep for CI. Covers 5 places secrets hide beyond .env files.">
+<meta property="og:url" content="https://labs.copperbaytech.com/leakcheck/guides/find-hardcoded-api-keys-in-codebase.html">
+<meta property="og:image" content="https://labs.copperbaytech.com/leakcheck/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#faf8f4">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"TechArticle","headline":"How to Find Hardcoded API Keys in Your Codebase","description":"A practical guide to auditing source code for hardcoded API keys and secrets before open-sourcing, deploying, or handing off a project: browser paste-scan, grep/ripgrep patterns, gitleaks working-tree scan, and Semgrep for CI.","author":{"@type":"Organization","name":"Copper Bay Labs","url":"https://copperbaytech.com"},"publisher":{"@type":"Organization","name":"Copper Bay Labs","url":"https://copperbaytech.com"},"datePublished":"2026-08-07","dateModified":"2026-08-07","mainEntityOfPage":"https://labs.copperbaytech.com/leakcheck/guides/find-hardcoded-api-keys-in-codebase.html","mainEntity":{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is the difference between scanning the working tree and scanning git history?","acceptedAnswer":{"@type":"Answer","text":"Scanning the working tree examines the files as they exist right now on disk — the current state of your code. Scanning git history examines every commit that ever entered the repository, including files that were deleted or overwritten in later commits. A secret you removed from a file last week is gone from the working tree but is still readable in history by anyone who runs git log -p. This guide covers working-tree audits; the companion guide on scanning a git repository covers the full history audit. If you are preparing to open-source a project, you need both."}},{"@type":"Question","name":"Will grep catch secrets in minified JavaScript or bundled build output?","acceptedAnswer":{"@type":"Answer","text":"Yes. Bundlers like webpack and esbuild inline the value of environment variables referenced with process.env at build time. A key that was stored correctly as an env var during development can end up as a literal string in dist/main.js or .next/static/chunks/. Both grep and ripgrep scan file contents regardless of formatting. Run the same credential-format patterns against your dist/, .next/, and build/ directories explicitly, since ripgrep may skip them if they are in .gitignore."}},{"@type":"Question","name":"Do I need to scan node_modules?","acceptedAnswer":{"@type":"Answer","text":"Not for an audit of your own code. node_modules contains third-party packages you do not control; any secret in there belongs to the package author, not to your project. Exclude it from every scan. If you are concerned about malicious packages embedding secrets in dependency code, that is a supply-chain problem best addressed by dependency scanning tools, not a secret scan."}},{"@type":"Question","name":"I'm about to open-source a project — what order should I check?","acceptedAnswer":{"@type":"Answer","text":"In order of importance: (1) paste your main application files and any config files into LeakCheck; (2) run a ripgrep value-pattern scan across the whole repo excluding node_modules; (3) scan the full git history with gitleaks detect — this is the step most people skip and the most common place secrets survive; (4) check your README and docs/ folder for real credentials in curl examples; (5) if you committed build output, check dist/ and .next/ for inlined env vars. Do not skip step 3 — a working-tree clean scan does not confirm whether the key appears in an older commit."}},{"@type":"Question","name":"My grep search returns hundreds of results from documentation examples — how do I filter them?","acceptedAnswer":{"@type":"Answer","text":"Pipe through a second grep that excludes placeholder strings: rg 'api_?key' . | grep -vi 'your_key|example|placeholder|xxx|123456'. In ripgrep, use --glob '!docs/examples/**' and --glob '!tests/fixtures/**' to skip directories with documentation examples. For gitleaks and Semgrep, add a .gitleaks.toml or .semgrepignore allowlist — both tools respect per-path exclusion rules."}},{"@type":"Question","name":"How does LeakCheck compare to running ripgrep manually?","acceptedAnswer":{"@type":"Answer","text":"LeakCheck runs 40+ credential-specific patterns with severity ratings and masked output — zero setup. ripgrep gives raw file-and-line output and requires writing the correct regex for each credential type. LeakCheck is faster for checking a single file or config snippet; ripgrep scales better for a full directory tree. Use LeakCheck for ad-hoc checks during development and ripgrep (or gitleaks) for systematic full-codebase coverage."}},{"@type":"Question","name":"I found a Stripe test key (sk_test_...) — do I still need to rotate it?","acceptedAnswer":{"@type":"Answer","text":"Yes. Stripe test keys are valid credentials against Stripe's test environment. A leaked test key gives an attacker access to your test data and the ability to probe your payment integration for vulnerabilities. They do not give access to live payment data, but they are not zero-risk. Rotate any hardcoded test key and store the replacement in an environment variable."}}]}}
+</script>
+<link rel="stylesheet" href="../styles.css?v=2">
+<style>
+  .doc .lede{font-size:clamp(17px,2.3vw,20px);color:var(--muted)}
+  .doc h2{scroll-margin-top:80px}
+  .doc h3{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:19px;margin:22px 0 6px;letter-spacing:-.01em}
+  .toc{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 6px;padding:0;list-style:none}
+  .toc a{display:inline-block;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;color:var(--muted)}
+  .toc a:hover{border-color:var(--bay);color:var(--ink);text-decoration:none}
+  .callout.warn-callout{background:var(--fail-bg);border-left-color:var(--fail);color:#5e2019}
+  .callout.tip-callout{background:var(--pass-bg);border-left-color:var(--pass);color:#1b4d30}
+  .doc code.inline{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--line-2);padding:2px 6px;border-radius:5px}
+  pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:12px 0}
+  pre code{background:none;padding:0;font-size:inherit}
+  .tool-table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+  .tool-table th{text-align:left;padding:10px 14px;background:var(--surface);border-bottom:2px solid var(--line);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .tool-table td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  .tool-table tr:last-child td{border-bottom:none}
+  .hide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0}
+  .hide-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .hide-card h3{margin:0 0 4px;font-size:15px;font-family:"Fraunces",serif;font-weight:600}
+  .hide-card p{color:var(--muted);font-size:13px;margin:0}
+  .suite{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0 6px}
+  .suite a{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s,border-color .15s}
+  .suite a:hover{text-decoration:none;box-shadow:var(--shadow-lift);transform:translateY(-2px);border-color:var(--line-2)}
+  .suite .s-name{font-family:"Fraunces",serif;font-weight:600;font-size:17px;color:var(--ink);display:block;margin:0 0 4px}
+  .suite p{color:var(--muted);font-size:14px;margin:0}
+  .suite .s-tag{display:inline-block;margin-bottom:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--bay);background:var(--bay-tint,#e8f4f6);border:1px solid #cfe1e3;border-radius:6px;padding:2px 8px}
+  .faq-section{margin:18px 0}
+  .faq-section details{border-bottom:1px solid var(--line);padding:14px 0}
+  .faq-section details:first-child{border-top:1px solid var(--line)}
+  .faq-section summary{font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .faq-section summary::-webkit-details-marker{display:none}
+  .faq-section summary::after{content:"+";font-size:20px;color:var(--muted);flex-shrink:0}
+  .faq-section details[open] summary::after{content:"\2212"}
+  .faq-section details p,.faq-section details ul{margin:12px 0 4px;color:var(--muted)}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="masthead" role="banner">
+  <div class="wrap hdr-bar">
+    <a class="brand" href="../" aria-label="LeakCheck — go to homepage">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 4 54 12v18c0 14-9 24-22 30C19 54 10 44 10 30V12L32 4Z" fill="none" stroke="#13525a" stroke-width="4" stroke-linejoin="round"/>
+        <circle cx="27" cy="28" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+        <path d="M33 34 44 45" stroke="#bf6b3c" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <span class="wordmark">LeakCheck</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="../about.html">How it works</a>
+      <a href="accidentally-committed-api-key-github.html">Guides</a>
+      <a href="../">Scan your code</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<article class="doc">
+  <div class="wrap narrow">
+    <p class="eyebrow" style="text-align:left">Audit guide</p>
+    <h1>How to find hardcoded API keys in your codebase</h1>
+    <p class="lede">Hardcoded secrets are the most common class of credential exposure in developer projects — and AI-assisted coding has made it worse, not better. LLMs frequently suggest inline API calls with keys embedded directly in function arguments. This guide covers how to audit your source code for hardcoded credentials: a quick browser scan for individual files, grep and ripgrep patterns you can run anywhere, a gitleaks working-tree scan, and Semgrep for CI integration.</p>
+
+    <ul class="toc" aria-label="On this page">
+      <li><a href="#where">Where secrets hide (beyond .env)</a></li>
+      <li><a href="#leakcheck">Quick scan: LeakCheck</a></li>
+      <li><a href="#grep">grep / ripgrep patterns</a></li>
+      <li><a href="#gitleaks">gitleaks --no-git</a></li>
+      <li><a href="#semgrep">Semgrep</a></li>
+      <li><a href="#found">Found one — now what?</a></li>
+      <li><a href="#prevent">Stop the next one</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+
+    <h2 id="where">Where secrets hide beyond <code class="inline">.env</code> files</h2>
+    <p>Most developers know to check their <code class="inline">.env</code> file before committing. What they miss is that secrets regularly appear in five other locations — and three of them are specific to AI-assisted development.</p>
+
+    <div class="hide-grid">
+      <div class="hide-card">
+        <h3>Inline in source files</h3>
+        <p>The classic AI-generated code problem. LLMs often suggest <code class="inline">const client = new OpenAI({ apiKey: "sk-..." })</code> directly in function bodies rather than reading from <code class="inline">process.env</code>. One accepted autocomplete and the key is in your working tree.</p>
+      </div>
+      <div class="hide-card">
+        <h3>Config files committed to the repo</h3>
+        <p><code class="inline">firebase.json</code>, <code class="inline">config.py</code>, <code class="inline">database.yml</code>, <code class="inline">appsettings.json</code> — these look like infra config, not credential stores, but they frequently contain embedded API keys and connection strings that were never moved to environment variables.</p>
+      </div>
+      <div class="hide-card">
+        <h3>Test files and fixtures</h3>
+        <p>A test that made a real API call during development and was never cleaned up. A seed script that hard-codes a database connection string. These often hold credentials that were rotated everywhere else but left in the test directory untouched.</p>
+      </div>
+      <div class="hide-card">
+        <h3>Documentation and README</h3>
+        <p>curl examples with real keys pasted from a working shell session. API reference docs with live credentials in code blocks. These are almost never checked because they do not feel like &ldquo;code.&rdquo;</p>
+      </div>
+      <div class="hide-card">
+        <h3>Build artifacts and generated files</h3>
+        <p>Bundlers like webpack and Vite inline <code class="inline">process.env.MY_KEY</code> values at build time. A key that lived safely in <code class="inline">.env.local</code> can end up as a plaintext literal in <code class="inline">dist/main.js</code> or <code class="inline">.next/static/chunks/</code> if the build output is committed to the repository.</p>
+      </div>
+    </div>
+
+    <h2 id="leakcheck">Quick scan: LeakCheck in the browser</h2>
+    <p>LeakCheck runs 40+ credential patterns client-side — nothing is uploaded. It is the fastest way to check a specific file or config snippet without installing anything.</p>
+    <p>What to paste for a pre-ship audit:</p>
+    <ul>
+      <li>The main application file (<code class="inline">app.js</code>, <code class="inline">main.py</code>, <code class="inline">index.ts</code>)</li>
+      <li>Any config file in the repository (<code class="inline">config.json</code>, <code class="inline">firebase.json</code>, <code class="inline">database.yml</code>)</li>
+      <li>The README and any files in <code class="inline">docs/</code> that contain code examples</li>
+      <li>Build output — the compiled <code class="inline">dist/main.js</code> or a chunk from <code class="inline">.next/static/</code></li>
+    </ul>
+    <p>LeakCheck does not crawl a directory — it scans whatever you paste. For a full codebase audit across hundreds of files, use the CLI tools below and reach for LeakCheck for the specific files those flag, or for quick ad-hoc checks during development.</p>
+    <p style="margin:24px 0 8px"><a class="btn primary" href="../">Paste and scan with LeakCheck &rarr;</a></p>
+
+    <h2 id="grep">grep / ripgrep &mdash; zero install, works on any machine</h2>
+    <p><code class="inline">grep</code> is preinstalled on macOS and Linux. <code class="inline">ripgrep</code> (<code class="inline">rg</code>) is faster, respects <code class="inline">.gitignore</code> automatically, and is worth installing for any regular audit. Both work without any additional scanner tooling.</p>
+
+    <h3>Strategy 1: search by variable name</h3>
+    <p>Most hardcoded secrets appear in assignment context — a variable or config key named <code class="inline">api_key</code>, <code class="inline">secret</code>, <code class="inline">token</code>, or <code class="inline">password</code> assigned a string value. This catches them regardless of the credential&rsquo;s format:</p>
+    <pre><code># grep (preinstalled on macOS / Linux)
+grep -rn \
+  -e 'api[_-]\?key\s*[=:]' \
+  -e 'api[_-]\?secret\s*[=:]' \
+  -e 'auth[_-]\?token\s*[=:]' \
+  -e 'access[_-]\?token\s*[=:]' \
+  -e 'private[_-]\?key\s*[=:]' \
+  -e 'client[_-]\?secret\s*[=:]' \
+  -e 'password\s*[=:]' \
+  --include="*.js" --include="*.ts" --include="*.jsx" --include="*.tsx" \
+  --include="*.py" --include="*.rb" --include="*.go" --include="*.php" \
+  --include="*.json" --include="*.yaml" --include="*.yml" --include="*.toml" \
+  . | grep -v "/node_modules/" | grep -v "/.git/"
+
+# ripgrep (brew install ripgrep) — respects .gitignore automatically
+rg -i '(api[_-]?key|api[_-]?secret|auth[_-]?token|access[_-]?token|private[_-]?key|client[_-]?secret|password)\s*[:=]' \
+  -t js -t ts -t py -t rb -t go -t php \
+  --glob '*.json' --glob '*.yaml' --glob '*.yml' --glob '*.toml' \
+  --glob '!node_modules/**' --glob '!.git/**'</code></pre>
+
+    <h3>Strategy 2: search by credential value format</h3>
+    <p>These patterns match the actual shape of credentials from major providers, regardless of what variable they are assigned to. Useful for catching keys embedded as function arguments rather than named assignments:</p>
+    <pre><code># ripgrep — specific credential formats
+rg 'AKIA[0-9A-Z]{16}' .                              # AWS access key ID
+rg 'sk-[a-zA-Z0-9]{20,}' .                           # OpenAI API key
+rg 'sk_(live|test)_[a-zA-Z0-9]{24,}' .              # Stripe secret key
+rg 'gh[pors]_[a-zA-Z0-9]{36,}' .                    # GitHub PATs (classic + fine-grained)
+rg 'xoxb-[0-9]+-[a-zA-Z0-9]+' .                     # Slack bot token
+rg 'AC[a-f0-9]{32}' .                               # Twilio Account SID
+rg '-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----' .  # PEM private keys
+
+# Exclude build artifacts and dependencies
+rg 'AKIA[0-9A-Z]{16}' . \
+  --glob '!node_modules/**' \
+  --glob '!.git/**' \
+  --glob '!dist/**' \
+  --glob '!.next/**' \
+  --glob '!build/**' \
+  --glob '!vendor/**'</code></pre>
+
+    <div class="callout tip-callout">
+      <strong>Too many false positives?</strong> Pipe through a second filter to exclude placeholder strings: <code class="inline">rg 'api_?key' . | grep -vi 'your_key\|example\|placeholder\|xxx\|123456'</code>. In ripgrep, use <code class="inline">--glob '!docs/examples/**'</code> to skip directories that contain only documentation examples.
+    </div>
+
+    <h3>Don&rsquo;t skip build output</h3>
+    <p>Build artifacts are where secrets from <code class="inline">.env</code> files most commonly surface in a form developers don&rsquo;t expect. Run the same grep patterns against <code class="inline">dist/</code>, <code class="inline">.next/</code>, and <code class="inline">build/</code> explicitly &mdash; ripgrep skips them if they are in <code class="inline">.gitignore</code>, but they are worth a direct check before any deploy:</p>
+    <pre><code># Scan build output directly (override .gitignore exclusion with --no-ignore)
+rg 'AKIA[0-9A-Z]{16}' dist/ --no-ignore 2>/dev/null
+rg 'sk-[a-zA-Z0-9]{20,}' .next/ --no-ignore 2>/dev/null</code></pre>
+
+    <h2 id="gitleaks">gitleaks working-tree scan (<code class="inline">--no-git</code>)</h2>
+    <p>Most people know <a href="https://github.com/gitleaks/gitleaks" target="_blank" rel="noopener noreferrer">gitleaks</a> for scanning git history (<code class="inline">gitleaks detect</code>). It also has a working-tree mode that scans the current files on disk without walking git object history &mdash; the right mode when you want to audit what is in the code right now.</p>
+    <p>Use cases for <code class="inline">--no-git</code>:</p>
+    <ul>
+      <li>Auditing a project that was never initialized as a git repo (a downloaded archive, a vendor package directory)</li>
+      <li>Scanning only the current file state without the noise of old historical findings you already know about</li>
+      <li>Running a scan before <code class="inline">git init</code> on a new project</li>
+    </ul>
+    <pre><code># Install gitleaks
+brew install gitleaks   # macOS
+# Linux: download binary from github.com/gitleaks/gitleaks/releases
+
+# Scan the working tree as a plain directory (no git history)
+gitleaks detect --source . --no-git
+
+# With a JSON report for further processing
+gitleaks detect --source . --no-git --report-path working-tree-report.json
+
+# Verbose: show context around each finding
+gitleaks detect --source . --no-git --verbose</code></pre>
+
+    <p>This is distinct from the two other gitleaks modes: <code class="inline">gitleaks detect</code> (walks all git commits) and <code class="inline">gitleaks protect --staged</code> (scans only staged files). The <code class="inline">--no-git</code> flag treats the directory as a plain filesystem and scans the content of every readable file.</p>
+
+    <div class="callout warn-callout">
+      <strong><code class="inline">--no-git</code> scans every file it can read</strong>, including <code class="inline">node_modules/</code> and build artifacts. Exclude large directories explicitly: <code class="inline">gitleaks detect --source . --no-git --ignore-path node_modules --ignore-path dist</code>. Alternatively, add a <code class="inline">.gitleaks.toml</code> allowlist with path exclusions.
+    </div>
+
+    <h2 id="semgrep">Semgrep &mdash; SAST that understands code structure</h2>
+    <p>grep and gitleaks match text patterns. <a href="https://semgrep.dev" target="_blank" rel="noopener noreferrer">Semgrep</a> matches patterns in the abstract syntax tree &mdash; it understands that <code class="inline">new Stripe({ apiKey: "sk_live_..." })</code> is a constructor call with a named argument, not just a line of text. This lets it catch credentials passed as function arguments, in multi-line assignments, and in contexts where the variable name does not suggest a secret.</p>
+    <p>Semgrep&rsquo;s community <code class="inline">p/secrets</code> ruleset covers OpenAI, AWS, Stripe, GitHub, GitLab, Slack, Twilio, SendGrid, and dozens more:</p>
+    <pre><code># Install
+pip install semgrep      # or: brew install semgrep
+
+# Run the community secrets ruleset
+semgrep --config p/secrets .
+
+# With JSON output for CI integration
+semgrep --config p/secrets --json . > semgrep-report.json
+
+# Exclude test fixtures and dependency directories
+semgrep --config p/secrets \
+  --exclude 'node_modules' \
+  --exclude 'tests/fixtures' \
+  --exclude 'docs/examples' \
+  .</code></pre>
+
+    <p>Semgrep works on any code directory regardless of whether it uses git, making it a good fit for auditing a directory before version control is initialized or integrating into a CI pipeline that needs a SAST check alongside the git-history scanner.</p>
+
+    <table class="tool-table">
+      <thead><tr><th>Tool</th><th>Scans</th><th>Install needed</th><th>Best for</th></tr></thead>
+      <tbody>
+        <tr><td>LeakCheck (browser)</td><td>Pasted text</td><td>No</td><td>Quick check of a single file or snippet</td></tr>
+        <tr><td>grep / ripgrep</td><td>Working tree</td><td>grep: no; rg: yes</td><td>Fast full-directory scan, scriptable, no external deps</td></tr>
+        <tr><td>gitleaks --no-git</td><td>Working tree</td><td>Yes</td><td>40+ patterns, JSON report, non-git directories</td></tr>
+        <tr><td>Semgrep p/secrets</td><td>Working tree</td><td>Yes</td><td>Code-structure-aware matching; CI SAST integration</td></tr>
+        <tr><td>gitleaks detect</td><td>Full git history</td><td>Yes</td><td>Complete history audit &mdash; see companion guide</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="found">Found a hardcoded key &mdash; what now?</h2>
+    <p><strong>Rotate it at the provider first</strong>, before touching the code. Deleting the line or replacing it with an environment-variable reference in the working tree does nothing for a credential that has already been committed to history or deployed to a server. Rotation at the provider is what actually stops the exposure.</p>
+    <p>After rotating:</p>
+    <ol>
+      <li>Replace the hardcoded value with a reference to an environment variable (<code class="inline">process.env.MY_KEY</code>, <code class="inline">os.getenv("MY_KEY")</code>, etc.)</li>
+      <li>Store the new credential value in your hosting platform&rsquo;s secrets UI or a local <code class="inline">.env</code> file that is in <code class="inline">.gitignore</code></li>
+      <li>If the key was ever in a committed file, scan git history to confirm it is not in older commits &mdash; the working-tree audit only tells you what is in the files now</li>
+    </ol>
+    <p>The complete remediation sequence &mdash; provider-by-provider rotation, git history cleanup with <code class="inline">git filter-repo</code> and BFG, and prevention &mdash; is in the companion guide:</p>
+    <p style="margin:24px 0 8px"><a class="btn primary" href="accidentally-committed-api-key-github.html">Full remediation: accidentally committed API key &rarr;</a></p>
+
+    <h2 id="prevent">Stop the next one from getting in</h2>
+    <p>An audit finds what is already there. Two additional layers stop new secrets from entering the codebase in the first place:</p>
+    <ul>
+      <li><strong>Pre-commit hook:</strong> runs <code class="inline">gitleaks protect --staged</code> before each commit and rejects it if a credential pattern is found in the staged diff. See the <a href="prevent-committing-secrets-pre-commit.html">pre-commit secret scanning guide</a> for the three setup approaches (pre-commit framework, Husky, raw hook).</li>
+      <li><strong>Git history scan:</strong> confirms nothing leaked in commits that predate the hook. Run <code class="inline">gitleaks detect --source . --log-opts="--all"</code> against the full history. See the <a href="scan-git-repository-for-secrets.html">git repository scanning guide</a> for the full workflow, including CI enforcement with GitHub Actions.</li>
+    </ul>
+    <p>If you want a second opinion on any staged diff before committing, paste the output of <code class="inline">git diff --cached</code> directly into LeakCheck:</p>
+    <p style="margin:24px 0 8px"><a class="btn" href="../">Scan a staged diff with LeakCheck &rarr;</a></p>
+
+    <h2 id="faq">Frequently asked questions</h2>
+    <div class="faq-section">
+      <details open>
+        <summary>What is the difference between scanning the working tree and scanning git history?</summary>
+        <p>Scanning the working tree examines the files as they exist right now on disk. Scanning git history examines every commit that ever entered the repository, including files that were deleted or overwritten in later commits. A secret you removed from a file last week is gone from the working tree but is still readable in history by anyone who runs <code class="inline">git log -p</code>. This guide covers working-tree audits; the <a href="scan-git-repository-for-secrets.html">git history guide</a> covers the full history audit. If you are preparing to open-source a project, you need both.</p>
+      </details>
+      <details>
+        <summary>Will grep catch secrets in minified JavaScript or bundled build output?</summary>
+        <p>Yes. Bundlers like webpack and esbuild inline the value of environment variables referenced with <code class="inline">process.env</code> at build time. A key that was stored correctly as an env var during development can end up as a literal string in <code class="inline">dist/main.js</code> or <code class="inline">.next/static/chunks/</code>. Both grep and ripgrep scan file contents regardless of formatting &mdash; minified files are just very long lines. Run the same credential-format patterns against your <code class="inline">dist/</code>, <code class="inline">.next/</code>, and <code class="inline">build/</code> directories explicitly, since ripgrep may skip them if they are in <code class="inline">.gitignore</code>.</p>
+      </details>
+      <details>
+        <summary>Do I need to scan <code class="inline">node_modules</code>?</summary>
+        <p>Not for an audit of your own code. <code class="inline">node_modules</code> contains third-party packages you do not control; any secret in there belongs to the package author, not to your project. Exclude it from every scan with <code class="inline">--glob '!node_modules/**'</code> in ripgrep or <code class="inline">| grep -v node_modules</code> in grep. If you are concerned about malicious packages embedding backdoors in dependency code, that is a supply-chain problem best addressed by <a href="https://labs.copperbaytech.com/depcheck/" target="_blank" rel="noopener noreferrer">dependency scanning</a>, not a secret scan.</p>
+      </details>
+      <details>
+        <summary>I&rsquo;m about to open-source a project &mdash; what order should I check?</summary>
+        <p>In order of importance: (1) paste your main application files and any config files into LeakCheck; (2) run a ripgrep value-pattern scan across the whole repo excluding <code class="inline">node_modules</code>; (3) <strong>scan the full git history with <code class="inline">gitleaks detect</code></strong> &mdash; this is the step most people skip and the most common place secrets survive after being &ldquo;deleted&rdquo; from the working tree; (4) check your README and <code class="inline">docs/</code> folder for real credentials in curl examples; (5) if you committed build output, check <code class="inline">dist/</code> and <code class="inline">.next/</code> for inlined env vars.</p>
+      </details>
+      <details>
+        <summary>My grep search returns hundreds of results from documentation examples &mdash; how do I filter them?</summary>
+        <p>Pipe through a second grep that excludes placeholder strings: <code class="inline">rg 'api_?key' . | grep -vi 'your_key\|example\|placeholder\|xxx\|123456'</code>. In ripgrep, use <code class="inline">--glob '!docs/examples/**'</code> and <code class="inline">--glob '!tests/fixtures/**'</code> to skip directories with documentation examples. For gitleaks and Semgrep, add a <code class="inline">.gitleaks.toml</code> or <code class="inline">.semgrepignore</code> allowlist &mdash; see the <a href="prevent-committing-secrets-pre-commit.html#allowlist">allowlist section of the pre-commit guide</a> for the exact syntax.</p>
+      </details>
+      <details>
+        <summary>How does LeakCheck compare to running ripgrep manually?</summary>
+        <p>LeakCheck runs 40+ credential-specific patterns with severity ratings and masked output &mdash; zero setup, nothing installed. ripgrep gives raw file-and-line output and requires writing the correct regex for each credential type. LeakCheck is faster for checking a single file or config snippet; ripgrep scales better for a full directory tree. The two are complementary: use LeakCheck for ad-hoc checks during development and ripgrep (or gitleaks) for systematic full-codebase coverage before open-sourcing or deploying.</p>
+      </details>
+      <details>
+        <summary>I found a Stripe test key (<code class="inline">sk_test_...</code>) &mdash; do I still need to rotate it?</summary>
+        <p>Yes. Stripe test keys are valid credentials against Stripe&rsquo;s test environment. A leaked test key gives an attacker access to your test data, the ability to enumerate your test customers and subscriptions, and the ability to probe your payment integration for vulnerabilities. They do not give access to live payment data, but they are not zero-risk. Rotate any hardcoded test key and store the replacement in an environment variable. If the key was ever in a public repository, assume it has been collected.</p>
+      </details>
+    </div>
+
+    <h2 style="margin-top:48px">Also in the Copper Bay Labs ship-safety suite</h2>
+    <p>Finding hardcoded secrets in source is one layer of a broader pre-deploy security posture. These free tools cover the rest:</p>
+    <div class="suite">
+      <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">
+        <span class="s-tag">Post-deploy</span>
+        <span class="s-name">ExposureCheck</span>
+        <p>Scan your live URL for exposed <code class="inline">.env</code> files, <code class="inline">.git</code> directories, source maps, and bundled secrets. Free, no signup.</p>
+      </a>
+      <a href="https://labs.copperbaytech.com/hardencheck/" target="_blank" rel="noopener noreferrer">
+        <span class="s-tag">HTTP hardening</span>
+        <span class="s-name">HardenCheck</span>
+        <p>Check your security headers &mdash; CSP, HSTS, X-Frame-Options, and more &mdash; so your site does not become an XSS vector.</p>
+      </a>
+      <a href="https://labs.copperbaytech.com/depcheck/" target="_blank" rel="noopener noreferrer">
+        <span class="s-tag">Dependencies</span>
+        <span class="s-name">DepCheck</span>
+        <p>Scan your <code class="inline">package.json</code> for vulnerable, outdated, and abandoned npm packages before they reach production.</p>
+      </a>
+    </div>
+  </div>
+</article>
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="wrap foot">
+    <div>
+      <a class="brand small" href="../" aria-label="LeakCheck — homepage">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M32 4 54 12v18c0 14-9 24-22 30C19 54 10 44 10 30V12L32 4Z" fill="none" stroke="#cbd2da" stroke-width="4" stroke-linejoin="round"/>
+          <circle cx="27" cy="28" r="9" fill="none" stroke="#bf6b3c" stroke-width="4"/>
+          <path d="M33 34 44 45" stroke="#bf6b3c" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <span class="wordmark">LeakCheck</span>
+      </a>
+      <p class="fine">Heuristic detection, not a security guarantee.</p>
+    </div>
+    <nav class="foot-nav" aria-label="Footer navigation">
+      <a href="../about.html">How it works</a>
+      <a href="accidentally-committed-api-key-github.html">Fix guides</a>
+      <a href="scan-git-repository-for-secrets.html">Detection guides</a>
+      <a href="find-hardcoded-api-keys-in-codebase.html" aria-current="page">Audit guide</a>
+      <a href="prevent-committing-secrets-pre-commit.html">Prevention guide</a>
+      <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">ExposureCheck</a>
+      <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
+    </nav>
+  </div>
+  <div class="wrap">
+    <p class="madeby">A <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Copper Bay Labs</a> product.</p>
+  </div>
+</footer>
+</body>
+</html>
