@@ -260,6 +260,7 @@ semgrep --config p/secrets \
       <li>Store the new credential value in your hosting platform&rsquo;s secrets UI or a local <code class="inline">.env</code> file that is in <code class="inline">.gitignore</code></li>
       <li>If the key was ever in a committed file, scan git history to confirm it is not in older commits &mdash; the working-tree audit only tells you what is in the files now</li>
     </ol>
+    <p>If the project has been deployed, also check whether any credentials are now publicly accessible through the live server. A secret committed to source often makes it through automated deploy pipelines into files that web servers can serve publicly — a <code class="inline">.env</code> in the project root, a bundled source map with inlined values, or a committed <code class="inline">.git</code> directory that exposes the full repository. <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">ExposureCheck</a> scans your live URL for exposed secrets — paste your site&rsquo;s URL for a free scan.</p>
     <p>The complete remediation sequence &mdash; provider-by-provider rotation, git history cleanup with <code class="inline">git filter-repo</code> and BFG, and prevention &mdash; is in the companion guide:</p>
     <p style="margin:24px 0 8px"><a class="btn primary" href="accidentally-committed-api-key-github.html">Full remediation: accidentally committed API key &rarr;</a></p>
 
