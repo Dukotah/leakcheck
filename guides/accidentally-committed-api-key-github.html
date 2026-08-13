@@ -173,7 +173,7 @@ config/secrets.yml
     <p>Commit and push this change. That removes the secret from the tip of the branch — but not from history. That is the next step.</p>
 
     <h2 id="git-history">Step 4: Scrub the secret from git history</h2>
-    <p>Deleting a line and committing the change removes the secret from the current working tree, but leaves it intact in every historical commit that ever contained it. Anyone with read access to the repo can run <code class="inline">git checkout &lt;old-sha&gt; -- .env</code> and read the original value. To actually expunge it, you need to rewrite the repository's commit graph.</p>
+    <p>Deleting a line and committing the change removes the secret from the current working tree, but leaves it intact in every historical commit that ever contained it. Anyone with read access to the repo can run <code class="inline">git checkout &lt;old-sha&gt; -- .env</code> and read the original value. To actually expunge it, you need to rewrite the repository's commit graph. For a complete walkthrough — including fresh-clone requirements, how to handle tags and stash, coordinating with collaborators, and verifying the rewrite — see the <a href="remove-secret-from-git-history.html">full history rewrite guide</a>. The essentials are below.</p>
 
     <h3>Option A: git-filter-repo (recommended)</h3>
     <p><code class="inline">git filter-repo</code> is the Git-project-endorsed replacement for the deprecated <code class="inline">git filter-branch</code>. It is significantly faster and safer.</p>
@@ -301,6 +301,7 @@ git push --force</code></pre>
       <a href="scan-git-repository-for-secrets.html">Detection guides</a>
       <a href="find-hardcoded-api-keys-in-codebase.html">Audit guide</a>
       <a href="prevent-committing-secrets-pre-commit.html">Prevention guide</a>
+      <a href="remove-secret-from-git-history.html">History rewrite guide</a>
       <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">ExposureCheck</a>
       <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
     </nav>

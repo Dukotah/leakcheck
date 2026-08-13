@@ -34,4 +34,10 @@
     <lastmod>2026-08-07</lastmod>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://labs.copperbaytech.com/leakcheck/guides/remove-secret-from-git-history.html</loc>
+    <changefreq>monthly</changefreq>
+    <lastmod>2026-08-13</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>
