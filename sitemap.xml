@@ -40,4 +40,10 @@
     <lastmod>2026-08-13</lastmod>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://labs.copperbaytech.com/leakcheck/guides/api-key-storage-best-practices.html</loc>
+    <changefreq>monthly</changefreq>
+    <lastmod>2026-09-07</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>
