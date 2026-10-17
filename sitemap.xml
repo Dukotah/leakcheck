@@ -58,4 +58,10 @@
     <lastmod>2026-10-07</lastmod>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://labs.copperbaytech.com/leakcheck/guides/prevent-secrets-javascript-bundle.html</loc>
+    <changefreq>monthly</changefreq>
+    <lastmod>2026-10-17</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>
