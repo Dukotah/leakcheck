@@ -108,9 +108,9 @@
 
     <h2 id="rotate-first">Rotate first, clean history second</h2>
     <p>A common mistake when discovering a key in a public repository is to immediately focus on git history cleanup — running <code class="inline">git filter-repo</code>, force-pushing, and contacting GitHub support to purge cached views. These are all correct steps, but they come second.</p>
-    <p>The reason: once a key appears in a public repository, automated scanning bots (GitHub's own secret scanning, TruffleHog, and commercial scanners) may capture it within minutes of the push. Rewriting history does not invalidate a credential that has already been copied. Revoking the key at the provider does.</p>
+    <p>The reason: once a key appears in a public repository, automated scanning bots (GitHub’s own secret scanning, TruffleHog, and commercial scanners) may capture it within minutes of the push. Rewriting history does not invalidate a credential that has already been copied. Revoking the key at the provider does.</p>
     <div class="callout urgent-callout">
-      <strong>First action:</strong> Open your provider's dashboard right now and revoke the key before reading the rest of this guide. The provider-specific steps below show exactly where to go.
+      <strong>First action:</strong> Open your provider’s dashboard right now and revoke the key before reading the rest of this guide. The provider-specific steps below show exactly where to go.
     </div>
 
     <h2 id="checklist">The 5-step rotation checklist</h2>
@@ -207,7 +207,7 @@
     </div>
 
     <h2 id="audit">Check whether the key was used maliciously</h2>
-    <p>After rotating, check your provider's audit logs for activity you did not generate. What to look for:</p>
+    <p>After rotating, check your provider’s audit logs for activity you did not generate. What to look for:</p>
     <table class="audit-table">
       <thead><tr><th>Provider</th><th>Where to look</th><th>What to check</th></tr></thead>
       <tbody>
@@ -233,7 +233,7 @@
 
     <h2 id="history">After rotation: clean up git history</h2>
     <p>Once the key is rotated, the value in git history is a dead credential. Clean it up anyway — to avoid confusing future developers, to satisfy automated scanners, and to prevent someone from accidentally copying a pattern from an old commit.</p>
-    <p>The full process — removing a secret from git history with <code class="inline">git filter-repo</code> and BFG Repo-Cleaner, force-pushing, and coordinating with GitHub's cache purge — is covered in the companion guide:</p>
+    <p>The full process — removing a secret from git history with <code class="inline">git filter-repo</code> and BFG Repo-Cleaner, force-pushing, and coordinating with GitHub’s cache purge — is covered in the companion guide:</p>
     <p style="margin:24px 0 8px"><a class="btn primary" href="remove-secret-from-git-history.html">Remove a secret from git history &rarr;</a></p>
     <p>Use LeakCheck to confirm exactly which files contain the pattern before starting the history rewrite — it avoids incomplete rewrites that leave a copy behind:</p>
     <p style="margin:16px 0 8px"><a class="btn secondary" href="../">Paste and scan with LeakCheck &rarr;</a></p>
@@ -246,7 +246,7 @@
       </details>
       <details>
         <summary>How do I know if my key was used before I rotated it?</summary>
-        <p>Check your provider's audit logs immediately after rotating. AWS has CloudTrail; GCP has Cloud Audit Logs; Stripe shows all API calls in Developers &rarr; Logs; OpenAI shows usage by key on the Usage page. Look for calls from unfamiliar IPs, geographic regions you do not operate in, or to endpoints you do not use. See the <a href="#audit">audit log table</a> above for provider-specific paths.</p>
+        <p>Check your provider’s audit logs immediately after rotating. AWS has CloudTrail; GCP has Cloud Audit Logs; Stripe shows all API calls in Developers &rarr; Logs; OpenAI shows usage by key on the Usage page. Look for calls from unfamiliar IPs, geographic regions you do not operate in, or to endpoints you do not use. See the <a href="#audit">audit log table</a> above for provider-specific paths.</p>
       </details>
       <details>
         <summary>What is the difference between revoking and rotating a key?</summary>
@@ -254,7 +254,7 @@
       </details>
       <details>
         <summary>Can I keep the old key live while I migrate consumers to the new one?</summary>
-        <p>Only if you must avoid downtime and the provider supports parallel keys — Stripe's "Roll" feature and Twilio's secondary token model are designed for exactly this. Otherwise, accept a brief outage rather than extending exposure. The longer both keys are live simultaneously, the longer the window in which the compromised key can be used. Aim to revoke the old key within minutes of confirming the new one is deployed everywhere.</p>
+        <p>Only if you must avoid downtime and the provider supports parallel keys — Stripe’s “Roll” feature and Twilio’s secondary token model are designed for exactly this. Otherwise, accept a brief outage rather than extending exposure. The longer both keys are live simultaneously, the longer the window in which the compromised key can be used. Aim to revoke the old key within minutes of confirming the new one is deployed everywhere.</p>
       </details>
       <details>
         <summary>How do I find every place my API key is deployed?</summary>
@@ -262,7 +262,7 @@
       </details>
       <details>
         <summary>Does LeakCheck detect whether a key is still live?</summary>
-        <p>No — LeakCheck identifies patterns that look like API keys in pasted code; it does not make outbound calls to providers to verify whether a key is active or revoked. It is most useful before keys leave your machine: scan your <code class="inline">.env</code>, a config file, or a staged diff before committing. For post-incident verification, check the provider's own audit logs to confirm no new activity on the old key after rotation.</p>
+        <p>No — LeakCheck identifies patterns that look like API keys in pasted code; it does not make outbound calls to providers to verify whether a key is active or revoked. It is most useful before keys leave your machine: scan your <code class="inline">.env</code>, a config file, or a staged diff before committing. For post-incident verification, check the provider’s own audit logs to confirm no new activity on the old key after rotation.</p>
       </details>
       <details>
         <summary>How often should I rotate API keys that were not leaked?</summary>
@@ -316,6 +316,7 @@
       <a href="api-key-storage-best-practices.html">Storage guide</a>
       <a href="vibe-coding-security-checklist.html">Vibe coding checklist</a>
       <a href="rotate-leaked-api-key.html" aria-current="page">Rotation guide</a>
+      <a href="prevent-secrets-javascript-bundle.html">Bundle leak guide</a>
       <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">ExposureCheck</a>
       <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
     </nav>
