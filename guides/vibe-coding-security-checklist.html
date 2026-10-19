@@ -87,7 +87,7 @@
   <div class="wrap narrow">
     <p class="eyebrow" style="text-align:left">Pre-ship checklist</p>
     <h1>Vibe coding security checklist: what to check before you ship AI-generated code</h1>
-    <p class="lede">AI coding tools&nbsp;&mdash; Cursor, Copilot, Lovable, Bolt, v0&nbsp;&mdash; can scaffold a working web app in minutes. They can also, without flagging it, hardcode an API key in a utility file, leave <code class="inline">.env</code> out of <code class="inline">.gitignore</code>, and generate a server config with no security headers. This isn&rsquo;t a flaw in those tools; it&rsquo;s their training data: most tutorials and Stack Overflow examples were written for clarity and explanation, not for production deployment. Here is the six-check sequence to run before any AI-assisted project goes live.</p>
+    <p class="lede">AI coding tools&nbsp;&mdash; Cursor, Copilot, Lovable, Bolt, v0&nbsp;&mdash; can scaffold a working web app in minutes. They can also, without flagging it, hardcode an API key in a utility file, leave <code class="inline">.env</code> out of <code class="inline">.gitignore</code>, and generate a server config with no security headers. This isn’t a flaw in those tools; it’s their training data: most tutorials and Stack Overflow examples were written for clarity and explanation, not for production deployment. Here is the six-check sequence to run before any AI-assisted project goes live.</p>
 
     <ul class="toc" aria-label="On this page">
       <li><a href="#why">Why AI tools introduce these gaps</a></li>
@@ -121,7 +121,7 @@
         <span class="mx" aria-hidden="true">🌐</span>
         <div>
           <p class="mt">Wildcard CORS on API routes</p>
-          <p class="md">AI-generated Express and Fastify routes default to <code style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;background:var(--line-2);padding:2px 5px;border-radius:4px">Access-Control-Allow-Origin: *</code> because it eliminates friction during development. Left in place in production, it allows any external site to make credentialed requests to your API from a visitor&rsquo;s browser.</p>
+          <p class="md">AI-generated Express and Fastify routes default to <code style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;background:var(--line-2);padding:2px 5px;border-radius:4px">Access-Control-Allow-Origin: *</code> because it eliminates friction during development. Left in place in production, it allows any external site to make credentialed requests to your API from a visitor’s browser.</p>
         </div>
       </li>
       <li>
@@ -146,7 +146,7 @@
     <ol class="steps">
       <li>
         <strong>Scan your source code for exposed secrets</strong>
-        <p>Before your first commit and after any major AI-generated addition, paste your source files into <a href="../">LeakCheck</a>. LeakCheck runs pattern matching for API keys, tokens, connection strings, and other credentials entirely in your browser&nbsp;&mdash; nothing you paste is sent to a server. Pay particular attention to config files, utility modules, and any file with &ldquo;key&rdquo;, &ldquo;secret&rdquo;, or &ldquo;token&rdquo; in its name.</p>
+        <p>Before your first commit and after any major AI-generated addition, paste your source files into <a href="../">LeakCheck</a>. LeakCheck runs pattern matching for API keys, tokens, connection strings, and other credentials entirely in your browser&nbsp;&mdash; nothing you paste is sent to a server. Pay particular attention to config files, utility modules, and any file with “key”, “secret”, or “token” in its name.</p>
       </li>
       <li>
         <strong>Verify your .gitignore covers all env files</strong>
@@ -164,7 +164,7 @@ git check-ignore -v .env.production</code></pre>
       </li>
       <li>
         <strong>Check your security headers</strong>
-        <p>Paste your URL into <a href="https://labs.copperbaytech.com/hardencheck/" target="_blank" rel="noopener noreferrer">HardenCheck</a>. It checks your live site&rsquo;s Content-Security-Policy, HSTS, X-Frame-Options, Referrer-Policy, and other security headers in seconds, with plain-English guidance on what each missing header enables an attacker to do and how to add it to your specific stack (Express, Next.js, Netlify, Cloudflare, nginx). AI-generated projects consistently have zero security headers on first deploy.</p>
+        <p>Paste your URL into <a href="https://labs.copperbaytech.com/hardencheck/" target="_blank" rel="noopener noreferrer">HardenCheck</a>. It checks your live site’s Content-Security-Policy, HSTS, X-Frame-Options, Referrer-Policy, and other security headers in seconds, with plain-English guidance on what each missing header enables an attacker to do and how to add it to your specific stack (Express, Next.js, Netlify, Cloudflare, nginx). AI-generated projects consistently have zero security headers on first deploy.</p>
       </li>
       <li>
         <strong>Audit your dependencies</strong>
@@ -177,7 +177,7 @@ git check-ignore -v .env.production</code></pre>
     </ol>
 
     <h2 id="if-you-find-a-leak">If you find a secret that was already committed</h2>
-    <p>The order of operations matters: <strong>rotate the key first</strong>, then clean up the history. Removing a file from the working tree or rewriting git history does nothing for a key that is already in someone else&rsquo;s hands. Rotate the credential at the issuing service (OpenAI, Stripe, AWS, Supabase, etc.) to invalidate the old value immediately, then follow the steps to remove it from source and rewrite git history so the old commit no longer contains the value.</p>
+    <p>The order of operations matters: <strong>rotate the key first</strong>, then clean up the history. Removing a file from the working tree or rewriting git history does nothing for a key that is already in someone else’s hands. Rotate the credential at the issuing service (OpenAI, Stripe, AWS, Supabase, etc.) to invalidate the old value immediately, then follow the steps to remove it from source and rewrite git history so the old commit no longer contains the value.</p>
     <p>Detailed walkthroughs:</p>
     <ul>
       <li><a href="accidentally-committed-api-key-github.html">Accidentally committed an API key to GitHub&nbsp;&mdash; what to do right now</a></li>
@@ -188,19 +188,19 @@ git check-ignore -v .env.production</code></pre>
     <div class="faq-section">
       <details open>
         <summary>Do AI coding tools know about security best practices?</summary>
-        <p>They do, in the sense that they can give accurate security advice when asked. The issue is default behaviour: AI tools reproduce the most statistically common pattern for a given context, and the most common pattern in tutorials and example code is optimised for getting something running, not for production deployment. Asking your AI tool &ldquo;does this code have any security issues&rdquo; or &ldquo;add production-ready security headers to this server config&rdquo; often produces good results. The problem is that it does not volunteer those additions unprompted.</p>
+        <p>They do, in the sense that they can give accurate security advice when asked. The issue is default behaviour: AI tools reproduce the most statistically common pattern for a given context, and the most common pattern in tutorials and example code is optimised for getting something running, not for production deployment. Asking your AI tool “does this code have any security issues” or “add production-ready security headers to this server config” often produces good results. The problem is that it does not volunteer those additions unprompted.</p>
       </details>
       <details>
         <summary>Are source maps actually a security risk in production?</summary>
         <p>Yes. A <code class="inline">.js.map</code> file contains your full un-minified source code&nbsp;&mdash; function names, variable names, comments, and file structure&nbsp;&mdash; reconstructed from the bundled output. If served publicly, anyone can view it in browser devtools (Sources tab) or fetch the URL directly. This exposes proprietary business logic, API endpoint patterns, and anything accidentally left in comments. Disable source maps in production builds: set <code class="inline">build.sourcemap: false</code> in Vite, <code class="inline">devtool: false</code> in webpack for production, or <code class="inline">productionBrowserSourceMaps: false</code> in Next.js.</p>
       </details>
       <details>
-        <summary>My AI tool created a .env.example file — doesn't that mean .env is handled?</summary>
+        <summary>My AI tool created a .env.example file — doesn’t that mean .env is handled?</summary>
         <p><code class="inline">.env.example</code> is a committed template with placeholder values&nbsp;&mdash; correct. But the existence of <code class="inline">.env.example</code> does not mean <code class="inline">.env</code> is in <code class="inline">.gitignore</code>. These are independent files. Verify with <code class="inline">git check-ignore -v .env</code>; if it prints nothing, your real secrets file is unprotected. Add <code class="inline">.env*</code> to <code class="inline">.gitignore</code> before your first <code class="inline">git add .</code>.</p>
       </details>
       <details>
         <summary>Can I ask my AI tool to add security headers for me?</summary>
-        <p>Yes, and this works well. A prompt like &ldquo;add Content-Security-Policy, HSTS, X-Frame-Options, and Referrer-Policy headers to my Express server config&rdquo; or &ldquo;update my next.config.js to add security headers&rdquo; produces accurate output for most stacks. The catch is that you need to then verify the headers are actually present on the live site&nbsp;&mdash; misconfigured headers are common, and some middleware applies them only to certain routes or response types. HardenCheck scans the live response headers and tells you which ones are present, misconfigured, or missing.</p>
+        <p>Yes, and this works well. A prompt like “add Content-Security-Policy, HSTS, X-Frame-Options, and Referrer-Policy headers to my Express server config” or “update my next.config.js to add security headers” produces accurate output for most stacks. The catch is that you need to then verify the headers are actually present on the live site&nbsp;&mdash; misconfigured headers are common, and some middleware applies them only to certain routes or response types. HardenCheck scans the live response headers and tells you which ones are present, misconfigured, or missing.</p>
       </details>
       <details>
         <summary>What is the most common way AI-assisted projects get compromised?</summary>
@@ -228,7 +228,7 @@ git check-ignore -v .env.production</code></pre>
       <a href="https://labs.copperbaytech.com/hardencheck/" target="_blank" rel="noopener noreferrer">
         <span class="s-tag">HTTP hardening</span>
         <span class="s-name">HardenCheck</span>
-        <p>Check your live site&rsquo;s security headers: CSP, HSTS, X-Frame-Options, Referrer-Policy, and more.</p>
+        <p>Check your live site’s security headers: CSP, HSTS, X-Frame-Options, Referrer-Policy, and more.</p>
       </a>
       <a href="https://labs.copperbaytech.com/depcheck/" target="_blank" rel="noopener noreferrer">
         <span class="s-tag">Dependencies</span>
@@ -268,6 +268,7 @@ git check-ignore -v .env.production</code></pre>
       <a href="api-key-storage-best-practices.html">Storage guide</a>
       <a href="vibe-coding-security-checklist.html" aria-current="page">Vibe coding checklist</a>
       <a href="rotate-leaked-api-key.html">Rotation guide</a>
+      <a href="prevent-secrets-javascript-bundle.html">Bundle leak guide</a>
       <a href="https://labs.copperbaytech.com/exposurecheck/" target="_blank" rel="noopener noreferrer">ExposureCheck</a>
       <a href="https://copperbaytech.com" target="_blank" rel="noopener noreferrer">Secure my project &rarr;</a>
     </nav>
