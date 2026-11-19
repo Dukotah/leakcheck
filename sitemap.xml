@@ -64,4 +64,10 @@
     <lastmod>2026-10-17</lastmod>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://labs.copperbaytech.com/leakcheck/guides/github-actions-secrets-security.html</loc>
+    <changefreq>monthly</changefreq>
+    <lastmod>2026-11-19</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>
